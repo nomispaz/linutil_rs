@@ -19,6 +19,11 @@ pub enum CurrentScreen {
     List
 }
 
+pub enum Mode {
+    clone,
+    push
+}
+
 // contains the state of the app:
 // currently used screen widget,
 // current configuration of the list widget,
@@ -26,16 +31,31 @@ pub enum CurrentScreen {
 pub struct App {
     pub current_screen: CurrentScreen,
     pub list_screen: ListWidget,
-    pub restart: bool
+    pub restart: bool,
+    pub mode: String
 }
 
 impl App {
     pub fn new() -> App {
         App {
             current_screen: CurrentScreen::Main,
-            list_screen: ListWidget::new(vec![String::from("Item 1"), String::from("Item 2")]),
-            restart: false
+            list_screen: ListWidget::new(vec!["Clone repos".to_string(), "Push repos".to_string()]),
+            restart: false,
+            mode: "".to_string()
         }
+    }
+}
+
+fn handle_list_selection(app: &mut App) {
+    if app.mode == "Clone repos" {
+	let commands: Vec<&str> = vec!["curl https://api.github.com/users/nomispaz/repos | grep full_name | cut -d':' -f 2 | cut -d'\"' -f 2 | cut -d'/' -f 2"];
+        let output = run_commands(commands).expect("Test");
+        let vec_out =String::from_utf8_lossy(&output.stdout).into_owned();
+        let lines: Vec<String> = vec_out.split('\n').map(|s| s.into()).collect();
+        app.list_screen.set_items(lines);
+    }
+    else {
+        println!("Test");
     }
 }
 
@@ -85,7 +105,6 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> io::Result<()> {
                         return Ok(())
                     }                    KeyCode::Char('l') => {
                         app.current_screen = CurrentScreen::List;
-                        app.list_screen.items.push("Test".to_string());
                     }
                     KeyCode::Char('g') => app.current_screen = CurrentScreen::Main,
                     KeyCode::Up | KeyCode::Left => app.list_screen.previous(),
@@ -95,6 +114,10 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> io::Result<()> {
                         return Ok(())
                     }
                     KeyCode::Enter => {
+                        app.mode = app.list_screen.selected_item().unwrap().clone();
+                        handle_list_selection(app);
+                    }                    
+                    KeyCode::Tab => {
                         if let Some(index) = app.list_screen.state.selected() {
                             if index < app.list_screen.items.len() {
                                 // read output of command, convert it to vec<str> and update the
@@ -102,7 +125,7 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> io::Result<()> {
                                 let output = run_commands(vec!["ls -l"]).expect("Test");
                                 let vec_out =String::from_utf8_lossy(&output.stdout).into_owned();
                                 let lines: Vec<String> = vec_out.split('\n').map(|s| s.into()).collect();
-                                app.list_screen.set_items(lines)
+                                app.list_screen.set_items(lines);
                             }
                         }
 

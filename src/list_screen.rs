@@ -63,4 +63,12 @@ impl ListWidget {
     pub fn unselect(&mut self) {
         self.state.select(None);
     }
+
+    /// Returns the selected item if any, otherwise `None`.
+    pub fn selected_item(&self) -> Option<&String> {
+        match self.state.selected() {
+            Some(index) => self.items.get(index),
+            None => None,
+        }
+    }
 }
