@@ -2,12 +2,15 @@
 mod list_screen;
 use list_screen::ListWidget;
 
+mod ui;
+
 use std::io;
 
 use ratatui::{
     crossterm::event::{self, KeyCode, KeyEventKind},
     style::{Stylize, Style, Color, Modifier},
-    widgets::{Paragraph, List, Block, ListDirection, ListItem},
+    layout::{Constraint, Flex, Layout, Rect},
+    widgets::{Paragraph, List, Block, ListDirection, ListItem, Clear},
     DefaultTerminal,
 };
 
@@ -16,7 +19,7 @@ use std::process::{Command, Stdio, Output};
 
 pub enum CurrentScreen {
     Main,
-    List
+    List,
 }
 
 pub enum CurrentMode {
@@ -24,7 +27,7 @@ pub enum CurrentMode {
     None,
     PushMode,
     CloneExecute,
-    PushExecute
+    PushExecute,
 }
 
 // contains the state of the app:
@@ -35,7 +38,8 @@ pub struct App {
     pub current_screen: CurrentScreen,
     pub list_screen: ListWidget,
     pub restart: bool,
-    pub current_mode: CurrentMode
+    pub current_mode: CurrentMode,
+    pub password_prompt: bool,
 }
 
 impl App {
@@ -44,7 +48,8 @@ impl App {
             current_screen: CurrentScreen::Main,
             list_screen: ListWidget::new(vec!["Clone repos".to_string(), "Push repos".to_string()]),
             restart: false,
-            current_mode: CurrentMode::None
+            current_mode: CurrentMode::None,
+            password_prompt: false,
         }
     }
 }
@@ -114,13 +119,23 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> io::Result<()> {
    
             let main = Paragraph::new(main_text)
                 .white()
-                .on_blue();
+                .on_black();
+
+            let area = frame.area();
 
             // draw the widget corresponding to the current_screen
             match app.current_screen {
                 CurrentScreen::Main => frame.render_widget(main, frame.area()),
                 CurrentScreen::List => frame.render_stateful_widget(list, frame.area(), &mut app.list_screen.state)
             }
+
+            if app.password_prompt {
+                let block = Block::bordered().title("Popup");
+                let area = ui::popup_area(area, 60, 20);
+                frame.render_widget(Clear, area); //this clears out the background
+                frame.render_widget(block, area);
+            }
+
         })?;
       
         // define Key events
@@ -137,6 +152,7 @@ fn run(mut terminal: DefaultTerminal, app: &mut App) -> io::Result<()> {
                         app.list_screen.set_items(vec!["Clone repos".to_string(), "Push repos".to_string()]);
                         app.current_mode = CurrentMode::None;
                     }
+                    KeyCode::Char('p') => app.password_prompt = !app.password_prompt,
                     KeyCode::Up | KeyCode::Left => app.list_screen.previous(),
                     KeyCode::Down | KeyCode::Right => app.list_screen.next(),
                     KeyCode::Backspace => {
@@ -252,7 +268,7 @@ fn main() -> io::Result<()> {
         let mut command_prep: String = String::new();
         match app.current_mode {
             CurrentMode::CloneExecute => {
-                command_prep.push_str(&format!("git clone https://github.com/nomispaz/{selected_item} /home/simonheise/git_repos/test/{selected_item}"));
+                command_prep.push_str(&format!("git clone https://github.com/nomispaz/{selected_item} /home/simonheise/git_repos/{selected_item}"));
             }
             CurrentMode::PushExecute => {
                 let mut input = String::new();
